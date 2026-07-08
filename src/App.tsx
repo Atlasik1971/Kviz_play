@@ -1,0 +1,453 @@
+import { useEffect, useMemo, useRef, useState } from 'react'
+import confetti from 'canvas-confetti'
+import html2canvas from 'html2canvas'
+import { quizData } from './quizData'
+import type { QuizQuestion } from './quizData'
+import { publicUrl } from './publicUrl'
+import './styles.css'
+
+type View = 'splash' | 'start' | 'quiz' | 'result'
+
+type CategoryKey = 'guest' | 'good' | 'local' | 'expert'
+
+type Category = {
+  key: CategoryKey
+  label: string
+}
+
+type Stats = {
+  total: number
+  categories: Record<CategoryKey, number>
+}
+
+const STORAGE_KEY = 'kviz_moskovsky_stats_v1'
+const TOTAL_QUESTIONS = quizData.length
+const AUDIO_EXPERT = publicUrl('/audio/expert.mp3')
+const AUDIO_COMMON = publicUrl('/audio/common.mp3')
+
+type SoundState = 'idle' | 'playing' | 'blocked' | 'error' | 'done'
+
+const categoriesInUi: Category[] = [
+  { key: 'guest', label: 'Гость Московского района' },
+  { key: 'good', label: 'Хороший знаток района' },
+  { key: 'local', label: 'Краевед Московского района' },
+  { key: 'expert', label: 'Эксперт Московского района' },
+]
+
+const nominationShortLabels: Record<CategoryKey, string> = {
+  guest: 'Гость',
+  good: 'Знаток',
+  local: 'Краевед',
+  expert: 'Эксперт',
+}
+
+function categoryFromScore(score: number): Category {
+  if (score === 16) return categoriesInUi[3]
+  if (score >= 12) return categoriesInUi[2]
+  if (score >= 7) return categoriesInUi[1]
+  return categoriesInUi[0]
+}
+
+const defaultStats: Stats = {
+  total: 0,
+  categories: {
+    guest: 0,
+    good: 0,
+    local: 0,
+    expert: 0,
+  },
+}
+
+function loadStats(): Stats {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY)
+    if (!raw) return defaultStats
+    const parsed = JSON.parse(raw) as Partial<Stats>
+    const next: Stats = {
+      total: typeof parsed.total === 'number' ? parsed.total : 0,
+      categories: {
+        guest: parsed.categories?.guest ?? 0,
+        good: parsed.categories?.good ?? 0,
+        local: parsed.categories?.local ?? 0,
+        expert: parsed.categories?.expert ?? 0,
+      },
+    }
+    return next
+  } catch {
+    return defaultStats
+  }
+}
+
+function getResultAudioSrc(category: Category): string {
+  return category.key === 'expert' ? AUDIO_EXPERT : AUDIO_COMMON
+}
+
+export default function App() {
+  const [view, setView] = useState<View>('splash')
+  const [currentIndex, setCurrentIndex] = useState(0)
+  const [score, setScore] = useState(0)
+
+  const [stats, setStats] = useState<Stats>(() => defaultStats)
+  const [screenshotState, setScreenshotState] = useState<'idle' | 'loading' | 'done' | 'error'>('idle')
+  const [soundState, setSoundState] = useState<SoundState>('idle')
+
+  const resultCardRef = useRef<HTMLDivElement | null>(null)
+  const celebrateOnceRef = useRef(false)
+  const audioRef = useRef<HTMLAudioElement | null>(null)
+
+  const currentQuestion: QuizQuestion | undefined = view === 'quiz' ? quizData[currentIndex] : undefined
+  const progressPercent = useMemo(() => {
+    if (view !== 'quiz') return 0
+    return Math.round((currentIndex / TOTAL_QUESTIONS) * 100)
+  }, [currentIndex, view])
+
+  const resultCategory = useMemo(() => categoryFromScore(score), [score])
+
+  useEffect(() => {
+    setStats(loadStats())
+  }, [])
+
+  function stopResultAudio() {
+    const audio = audioRef.current
+    if (!audio) return
+    audio.pause()
+    audio.currentTime = 0
+    audioRef.current = null
+  }
+
+  async function playResultAudio(category: Category): Promise<boolean> {
+    try {
+      stopResultAudio()
+
+      const audio = new Audio(getResultAudioSrc(category))
+      audio.volume = 0.9
+      audio.loop = false
+      audioRef.current = audio
+
+      audio.addEventListener(
+        'ended',
+        () => {
+          setSoundState('done')
+        },
+        { once: true },
+      )
+
+      audio.addEventListener(
+        'error',
+        () => {
+          setSoundState('error')
+        },
+        { once: true },
+      )
+
+      await audio.play()
+      setSoundState('playing')
+      return true
+    } catch {
+      setSoundState('blocked')
+      return false
+    }
+  }
+
+  useEffect(() => {
+    if (view !== 'result') return
+
+    let disposed = false
+    const category = categoryFromScore(score)
+
+    void (async () => {
+      const played = await playResultAudio(category)
+      if (disposed && played) stopResultAudio()
+    })()
+
+    return () => {
+      disposed = true
+      stopResultAudio()
+    }
+  }, [view, score])
+
+  useEffect(() => {
+    if (view !== 'result') return
+    if (score !== 16) return
+    if (celebrateOnceRef.current) return
+
+    celebrateOnceRef.current = true
+
+    confetti({
+      particleCount: 220,
+      spread: 80,
+      origin: { y: 0.6 },
+      colors: ['#2563eb', '#ef4444', '#f59e0b', '#22c55e', '#a855f7'],
+    })
+
+    window.setTimeout(() => {
+      confetti({
+        particleCount: 120,
+        spread: 60,
+        origin: { y: 0.8 },
+        colors: ['#2563eb', '#ef4444', '#f59e0b'],
+      })
+    }, 350)
+  }, [score, view])
+
+  function persistStats(next: Stats) {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(next))
+    } catch {
+      // Игнорируем ошибки (например, private mode)
+    }
+  }
+
+  function startQuiz() {
+    stopResultAudio()
+    setSoundState('idle')
+    setView('quiz')
+    setCurrentIndex(0)
+    setScore(0)
+    celebrateOnceRef.current = false
+    setScreenshotState('idle')
+  }
+
+  async function handlePlayResultSound() {
+    await playResultAudio(resultCategory)
+  }
+
+  function finishQuiz(finalScore: number) {
+    setScore(finalScore)
+
+    const cat = categoryFromScore(finalScore)
+    setStats(prev => {
+      const next: Stats = {
+        total: prev.total + 1,
+        categories: {
+          ...prev.categories,
+          [cat.key]: prev.categories[cat.key] + 1,
+        },
+      }
+      persistStats(next)
+      return next
+    })
+
+    setView('result')
+  }
+
+  function handleAnswer(optionIndex: number) {
+    if (view !== 'quiz') return
+    if (!currentQuestion) return
+
+    const nextScore = score + (optionIndex === currentQuestion.correct ? 1 : 0)
+    if (currentIndex >= TOTAL_QUESTIONS - 1) {
+      finishQuiz(nextScore)
+      return
+    }
+
+    setScore(nextScore)
+    setCurrentIndex(i => i + 1)
+  }
+
+  async function handleScreenshot() {
+    if (!resultCardRef.current) return
+    setScreenshotState('loading')
+    try {
+      const canvas = await html2canvas(resultCardRef.current, {
+        backgroundColor: '#ffffff',
+        scale: 2,
+        useCORS: true,
+      })
+
+      const blob = await new Promise<Blob | null>(resolve => canvas.toBlob(resolve, 'image/png'))
+      if (!blob) throw new Error('Не удалось сформировать изображение')
+
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `result_${score}_из_16.png`
+      document.body.appendChild(a)
+      a.click()
+      a.remove()
+      URL.revokeObjectURL(url)
+      setScreenshotState('done')
+    } catch {
+      setScreenshotState('error')
+    }
+  }
+
+  return (
+    <div className="page">
+      <div className="container">
+        <div className={`card${view === 'splash' ? ' card--splash' : ''}`}>
+          {view === 'splash' && (
+            <div className="splashScreen">
+              <img className="splashCover" src={publicUrl('/images/quiz-cover-new.png')} alt="Знаете ли вы Московский район?" />
+              <button className="splashBtn" onClick={() => setView('start')}>
+                Начать прохождение
+              </button>
+            </div>
+          )}
+
+          {view !== 'splash' && (
+            <div className="header">
+              <div>
+                <h1 className="title">Знаете ли вы Московский район?</h1>
+                <p className="subtitle">Быстрый квиз из 16 вопросов. Без регистрации, только локальная статистика.</p>
+              </div>
+            </div>
+          )}
+
+          {view === 'start' && (
+            <>
+              <div className="startActions">
+                <button className="startBtn" onClick={startQuiz}>
+                  Начать квиз
+                </button>
+              </div>
+
+              <section className="statsSection" aria-label="Локальная статистика прохождений квиза">
+                <div className="statsSectionHead">
+                  <span className="badgeDot" aria-hidden="true" />
+                  <span>Локальный счётчик</span>
+                </div>
+
+                <div className="statBoxTotal">
+                  <div className="statLabel">Всего прошли квиз</div>
+                  <div className="statValue statValue--hero">{stats.total}</div>
+                </div>
+
+                <div className="statsNominationGrid">
+                  {categoriesInUi.map(cat => (
+                    <div key={cat.key} className="statBox statBox--nomination" title={cat.label}>
+                      <div className="statValue">{stats.categories[cat.key]}</div>
+                      <div className="statLabel">{nominationShortLabels[cat.key]}</div>
+                    </div>
+                  ))}
+                </div>
+              </section>
+
+              <div className="fineprint">
+                Подсказка: результат сохраняется в `localStorage` на этом устройстве. Персональные данные не собираются.
+              </div>
+            </>
+          )}
+
+          {view === 'quiz' && currentQuestion && (
+            <>
+              <div className="kvizRow">
+                <div>
+                  <div className="muted">
+                    Вопрос {currentIndex + 1} из {TOTAL_QUESTIONS}
+                  </div>
+                </div>
+                <div style={{ flex: '1 1 260px' }}>
+                  <div className="progressOuter" aria-label="Прогресс квиза">
+                    <div className="progressInner" style={{ width: `${progressPercent}%` }} />
+                  </div>
+                </div>
+              </div>
+
+              <div style={{ marginTop: 14 }}>
+                <p className="question">{currentQuestion.question}</p>
+                {currentQuestion.image && (
+                  <img
+                    className="questionBanner"
+                    src={publicUrl(currentQuestion.image)}
+                    alt={currentQuestion.question}
+                  />
+                )}
+                <div className="optionGrid">
+                  {currentQuestion.options.map((opt, i) => {
+                    const optionText = typeof opt === 'string' ? opt : opt.text
+                    const optionImage = typeof opt === 'string' ? undefined : opt.image
+                    const hasImage = Boolean(optionImage)
+
+                    return (
+                      <button
+                        key={`q${currentIndex}-opt-${i}-${optionText}`}
+                        className={`optionBtn${hasImage ? ' optionBtn--image' : ''}`}
+                        onClick={() => handleAnswer(i)}
+                      >
+                        {hasImage ? (
+                          <>
+                            <div className="optionImageWrap" aria-hidden="true">
+                              <img className="optionImage" src={publicUrl(optionImage)} alt={optionText} />
+                            </div>
+                          </>
+                        ) : (
+                          <>
+                            <span className="optionIndex">{String.fromCharCode(65 + i)}</span>
+                            <span className="optionText">{optionText}</span>
+                          </>
+                        )}
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+            </>
+          )}
+
+          {view === 'result' && (
+            <>
+              <div ref={resultCardRef} className="resultCard" aria-label="Карточка результата квиза">
+                <div className="resultHero">
+                  <div>
+                    <div className="muted">Ваш результат</div>
+                    <div style={{ marginTop: 6 }} className="scoreBig">
+                      {score}
+                      <span style={{ fontSize: '0.55em', fontWeight: 1000, marginLeft: 6, color: 'rgba(15,23,42,0.75)' }}>из 16</span>
+                    </div>
+                    <div style={{ fontWeight: 900, marginTop: 8 }}>
+                      Вы набрали {score} из 16
+                    </div>
+                  </div>
+
+                  <div className="categoryPill">
+                    <span className="categoryPillDot" />
+                    {resultCategory.label}
+                  </div>
+                </div>
+
+                {score === 16 ? (
+                  <div className="fineprint" style={{ marginTop: 14 }}>
+                    Отлично! 16/16 — конфетти и фанфары уже в деле.
+                  </div>
+                ) : (
+                  <div className="fineprint" style={{ marginTop: 14 }}>
+                    Неплохо! Хотите ещё разок — нажмите “Начать заново”.
+                  </div>
+                )}
+              </div>
+
+              <div className="kvizRow" style={{ marginTop: 14 }}>
+                <button className="secondaryBtn" onClick={handleScreenshot} disabled={screenshotState === 'loading'}>
+                  {screenshotState === 'loading' ? 'Сохраняю...' : 'Сделать скриншот результата'}
+                </button>
+                <button className="ghostBtn" onClick={startQuiz}>
+                  Начать заново
+                </button>
+              </div>
+
+              {soundState === 'blocked' && (
+                <div className="kvizRow" style={{ marginTop: 12 }}>
+                  <button className="ghostBtn" onClick={() => void handlePlayResultSound()}>
+                    Включить звук поздравления
+                  </button>
+                </div>
+              )}
+
+              {screenshotState === 'error' && (
+                <div className="fineprint" style={{ marginTop: 10, color: 'rgba(185,28,28,0.95)' }}>
+                  Не удалось сделать скриншот. Попробуйте ещё раз.
+                </div>
+              )}
+
+              <div className="fineprint">
+                Скриншот сохраняется на ваше устройство как PNG (картинка именно карточки результата).
+              </div>
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
