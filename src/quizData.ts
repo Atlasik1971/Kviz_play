@@ -1,6 +1,6 @@
 export type QuizQuestion = {
   question: string
-  options: Array<string | { text: string; image?: string }>
+  options: Array<string | { text: string; image?: string; reviewText?: string }>
   image?: string
   correct: number // индекс правильного варианта (0..3)
 }
@@ -19,10 +19,10 @@ export const quizData: QuizQuestion[] = [
   {
     question: 'Когда был образован Московский район Санкт-Петербурга?',
     options: [
-      { text: 'А', image: '/images/q2-a.png' },
-      { text: 'Б', image: '/images/q2-b.png' },
-      { text: 'В', image: '/images/q2-c.png' },
-      { text: 'Г', image: '/images/q2-d.png' },
+      { text: 'А', image: '/images/q2-a.png', reviewText: '27 июня 1703 года' },
+      { text: 'Б', image: '/images/q2-b.png', reviewText: '21 июня 1919 года' },
+      { text: 'В', image: '/images/q2-c.png', reviewText: '1 сентября 1965 года' },
+      { text: 'Г', image: '/images/q2-d.png', reviewText: '16 января 1812 года' },
     ],
     correct: 1,
   },
@@ -30,10 +30,10 @@ export const quizData: QuizQuestion[] = [
     question:
       'Какой из проспектов Санкт-Петербурга является одной из главных магистралей Московского района?',
     options: [
-      { text: 'А', image: '/images/q3-a.png' },
-      { text: 'Б', image: '/images/q3-b.png' },
-      { text: 'В', image: '/images/q3-c.png' },
-      { text: 'Г', image: '/images/q3-d.png' },
+      { text: 'А', image: '/images/q3-a.png', reviewText: 'Невский проспект' },
+      { text: 'Б', image: '/images/q3-b.png', reviewText: 'Большой проспект П.С.' },
+      { text: 'В', image: '/images/q3-c.png', reviewText: 'Московский проспект' },
+      { text: 'Г', image: '/images/q3-d.png', reviewText: 'Суворовский проспект' },
     ],
     correct: 2,
   },
@@ -57,10 +57,10 @@ export const quizData: QuizQuestion[] = [
   {
     question: 'Какой мемориальный комплекс находится на площади Победы?',
     options: [
-      { text: 'А', image: '/images/q6-a.png' },
-      { text: 'Б', image: '/images/q6-b.png' },
-      { text: 'В', image: '/images/q6-c.png' },
-      { text: 'Г', image: '/images/q6-d.png' },
+      { text: 'А', image: '/images/q6-a.png', reviewText: 'Московские триумфальные ворота' },
+      { text: 'Б', image: '/images/q6-b.png', reviewText: 'Памятник В.И. Ленину' },
+      { text: 'В', image: '/images/q6-c.png', reviewText: 'Монумент героическим защитникам Ленинграда' },
+      { text: 'Г', image: '/images/q6-d.png', reviewText: 'Памятник истребителю МИГ-19' },
     ],
     correct: 2,
   },
@@ -85,10 +85,10 @@ export const quizData: QuizQuestion[] = [
   {
     question: 'Какой известный храм Московского района имеет необычный «готический» облик?',
     options: [
-      { text: 'А', image: '/images/q10-a.png' },
-      { text: 'Б', image: '/images/q10-b.png' },
-      { text: 'В', image: '/images/q10-c.png' },
-      { text: 'Г', image: '/images/q10-d.png' },
+      { text: 'А', image: '/images/q10-a.png', reviewText: 'Храм Рождества Христова' },
+      { text: 'Б', image: '/images/q10-b.png', reviewText: 'Церковь святителя Николая Чудотворца' },
+      { text: 'В', image: '/images/q10-c.png', reviewText: 'Храм Святого Иоанна Предтечи, Чесменская церковь' },
+      { text: 'Г', image: '/images/q10-d.png', reviewText: 'Храм Казанской иконы Божьей Матери' },
     ],
     correct: 2,
   },
@@ -106,10 +106,10 @@ export const quizData: QuizQuestion[] = [
   {
     question: 'Какой объект установлен на площади Московские Ворота?',
     options: [
-      { text: 'А', image: '/images/q12-a.png' },
-      { text: 'Б', image: '/images/q12-b.png' },
-      { text: 'В', image: '/images/q12-c.png' },
-      { text: 'Г', image: '/images/q12-d.png' },
+      { text: 'А', image: '/images/q12-a.png', reviewText: 'Александровская колонна' },
+      { text: 'Б', image: '/images/q12-b.png', reviewText: 'Нарвские ворота' },
+      { text: 'В', image: '/images/q12-c.png', reviewText: 'Московские триумфальные ворота' },
+      { text: 'Г', image: '/images/q12-d.png', reviewText: 'Ростральные колонны' },
     ],
     correct: 2,
   },

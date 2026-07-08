@@ -86,15 +86,9 @@ function getResultAudioSrc(category: Category): string {
   return publicUrl(category.key === 'expert' ? '/audio/expert.mp3' : '/audio/common.mp3')
 }
 
-function getOptionLabel(option: string | { text: string; image?: string }, index: number): string {
+function getOptionReviewLabel(option: string | { text: string; image?: string; reviewText?: string }): string {
   if (typeof option === 'string') return option
-
-  const shortLabels = new Set(['А', 'Б', 'В', 'Г', 'A', 'B', 'C', 'D'])
-  if (option.image && shortLabels.has(option.text)) {
-    return option.text
-  }
-
-  return option.text
+  return option.reviewText || option.text
 }
 
 export default function App() {
@@ -473,7 +467,7 @@ export default function App() {
                             return (
                               <li key={optionIndex} className={optionClasses.join(' ')}>
                                 <span className="reviewOptionLetter">{String.fromCharCode(65 + optionIndex)}</span>
-                                <span className="reviewOptionText">{getOptionLabel(option, optionIndex)}</span>
+                                <span className="reviewOptionText">{getOptionReviewLabel(option)}</span>
                                 <span className="reviewOptionTags">
                                   {isQuestionCorrect && isSelected && (
                                     <span className="reviewTag reviewTag--ok">Ваш ответ — верно</span>
