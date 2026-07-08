@@ -294,15 +294,39 @@ export default function App() {
   }
 
   return (
-    <div className="page">
+    <div className={`page${view === 'splash' ? ' page--welcome' : ''}`}>
       <div className="container">
         <div className={`card${view === 'splash' ? ' card--splash' : ''}`}>
           {view === 'splash' && (
-            <div className="splashScreen">
-              <img className="splashCover" src={publicUrl('/images/quiz-cover-new.png')} alt="Знаете ли вы Московский район?" />
-              <button className="splashBtn" onClick={() => setView('start')}>
-                Начать прохождение
-              </button>
+            <div className="welcomeScreen">
+              <figure className="welcomeBanner">
+                <img
+                  className="welcomeBannerImg"
+                  src={publicUrl('/images/quiz-cover-new.png')}
+                  alt=""
+                  aria-hidden="true"
+                />
+              </figure>
+
+              <div className="welcomeCard">
+                <h1 className="welcomeTitle">Знаете ли вы Московский район?</h1>
+                <p className="welcomeLead">
+                  Интерактивный квиз о знаковых местах, истории и интересных фактах Московского района Санкт-Петербурга
+                </p>
+                <p className="welcomeNote">
+                  Пройдите 16 вопросов, узнайте свой результат и посмотрите правильные ответы в финале.
+                </p>
+
+                <div className="welcomeBadges" aria-label="Особенности квиза">
+                  <span className="welcomeBadge welcomeBadge--blue">16 вопросов</span>
+                  <span className="welcomeBadge welcomeBadge--red">Результат в финале</span>
+                  <span className="welcomeBadge welcomeBadge--blue">Правильные ответы</span>
+                </div>
+
+                <button className="welcomeBtn" type="button" onClick={() => setView('start')}>
+                  Начать квиз
+                </button>
+              </div>
             </div>
           )}
 
