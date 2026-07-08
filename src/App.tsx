@@ -22,8 +22,6 @@ type Stats = {
 
 const STORAGE_KEY = 'kviz_moskovsky_stats_v1'
 const TOTAL_QUESTIONS = quizData.length
-const AUDIO_EXPERT = publicUrl('/audio/expert.mp3')
-const AUDIO_COMMON = publicUrl('/audio/common.mp3')
 
 type SoundState = 'idle' | 'playing' | 'blocked' | 'error' | 'done'
 
@@ -79,7 +77,7 @@ function loadStats(): Stats {
 }
 
 function getResultAudioSrc(category: Category): string {
-  return category.key === 'expert' ? AUDIO_EXPERT : AUDIO_COMMON
+  return publicUrl(category.key === 'expert' ? '/audio/expert.mp3' : '/audio/common.mp3')
 }
 
 export default function App() {
