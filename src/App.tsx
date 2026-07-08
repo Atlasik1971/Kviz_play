@@ -25,6 +25,12 @@ const TOTAL_QUESTIONS = quizData.length
 
 type SoundState = 'idle' | 'playing' | 'blocked' | 'error' | 'done'
 
+type UserAnswer = {
+  questionIndex: number
+  selectedIndex: number
+  isCorrect: boolean
+}
+
 const categoriesInUi: Category[] = [
   { key: 'guest', label: 'Гость Московского района' },
   { key: 'good', label: 'Хороший знаток района' },
@@ -80,10 +86,22 @@ function getResultAudioSrc(category: Category): string {
   return publicUrl(category.key === 'expert' ? '/audio/expert.mp3' : '/audio/common.mp3')
 }
 
+function getOptionLabel(option: string | { text: string; image?: string }, index: number): string {
+  if (typeof option === 'string') return option
+
+  const shortLabels = new Set(['А', 'Б', 'В', 'Г', 'A', 'B', 'C', 'D'])
+  if (option.image && shortLabels.has(option.text)) {
+    return option.text
+  }
+
+  return option.text
+}
+
 export default function App() {
   const [view, setView] = useState<View>('splash')
   const [currentIndex, setCurrentIndex] = useState(0)
   const [score, setScore] = useState(0)
+  const [userAnswers, setUserAnswers] = useState<UserAnswer[]>([])
 
   const [stats, setStats] = useState<Stats>(() => defaultStats)
   const [screenshotState, setScreenshotState] = useState<'idle' | 'loading' | 'done' | 'error'>('idle')
@@ -202,6 +220,7 @@ export default function App() {
     setView('quiz')
     setCurrentIndex(0)
     setScore(0)
+    setUserAnswers([])
     celebrateOnceRef.current = false
     setScreenshotState('idle')
   }
@@ -210,7 +229,8 @@ export default function App() {
     await playResultAudio(resultCategory)
   }
 
-  function finishQuiz(finalScore: number) {
+  function finishQuiz(finalScore: number, finalAnswers: UserAnswer[]) {
+    setUserAnswers(finalAnswers)
     setScore(finalScore)
 
     const cat = categoryFromScore(finalScore)
@@ -233,12 +253,21 @@ export default function App() {
     if (view !== 'quiz') return
     if (!currentQuestion) return
 
-    const nextScore = score + (optionIndex === currentQuestion.correct ? 1 : 0)
+    const isCorrect = optionIndex === currentQuestion.correct
+    const answer: UserAnswer = {
+      questionIndex: currentIndex,
+      selectedIndex: optionIndex,
+      isCorrect,
+    }
+    const nextAnswers = [...userAnswers, answer]
+    const nextScore = score + (isCorrect ? 1 : 0)
+
     if (currentIndex >= TOTAL_QUESTIONS - 1) {
-      finishQuiz(nextScore)
+      finishQuiz(nextScore, nextAnswers)
       return
     }
 
+    setUserAnswers(nextAnswers)
     setScore(nextScore)
     setCurrentIndex(i => i + 1)
   }
@@ -414,6 +443,57 @@ export default function App() {
                   </div>
                 )}
               </div>
+
+              <section className="reviewSection" aria-label="Разбор ответов">
+                <h2 className="reviewTitle">Ваши ответы</h2>
+                <div className="reviewList">
+                  {quizData.map((question, questionIndex) => {
+                    const userAnswer = userAnswers.find(a => a.questionIndex === questionIndex)
+                    const selectedIndex = userAnswer?.selectedIndex
+                    const isQuestionCorrect = userAnswer?.isCorrect ?? false
+
+                    return (
+                      <article key={questionIndex} className="reviewCard">
+                        <div className="reviewQuestionNum">Вопрос {questionIndex + 1}</div>
+                        <p className="reviewQuestion">{question.question}</p>
+
+                        <ul className="reviewOptions">
+                          {question.options.map((option, optionIndex) => {
+                            const isSelected = selectedIndex === optionIndex
+                            const isCorrectOption = question.correct === optionIndex
+                            const optionClasses = ['reviewOption']
+
+                            if (isQuestionCorrect && isSelected) {
+                              optionClasses.push('reviewOption--correct')
+                            } else if (!isQuestionCorrect) {
+                              if (isSelected) optionClasses.push('reviewOption--wrong')
+                              if (isCorrectOption) optionClasses.push('reviewOption--correct')
+                            }
+
+                            return (
+                              <li key={optionIndex} className={optionClasses.join(' ')}>
+                                <span className="reviewOptionLetter">{String.fromCharCode(65 + optionIndex)}</span>
+                                <span className="reviewOptionText">{getOptionLabel(option, optionIndex)}</span>
+                                <span className="reviewOptionTags">
+                                  {isQuestionCorrect && isSelected && (
+                                    <span className="reviewTag reviewTag--ok">Ваш ответ — верно</span>
+                                  )}
+                                  {!isQuestionCorrect && isSelected && (
+                                    <span className="reviewTag reviewTag--user">Ваш ответ — неверно</span>
+                                  )}
+                                  {!isQuestionCorrect && isCorrectOption && (
+                                    <span className="reviewTag reviewTag--correct">Правильный ответ</span>
+                                  )}
+                                </span>
+                              </li>
+                            )
+                          })}
+                        </ul>
+                      </article>
+                    )
+                  })}
+                </div>
+              </section>
 
               <div className="kvizRow" style={{ marginTop: 14 }}>
                 <button className="secondaryBtn" onClick={handleScreenshot} disabled={screenshotState === 'loading'}>
