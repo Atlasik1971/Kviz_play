@@ -4,6 +4,7 @@ import html2canvas from 'html2canvas'
 import { quizData } from './quizData'
 import type { QuizQuestion } from './quizData'
 import { publicUrl } from './publicUrl'
+import { submitQuizResultToGoogleSheets } from './submitQuizResult'
 import './styles.css'
 
 type View = 'splash' | 'start' | 'quiz' | 'result'
@@ -103,6 +104,7 @@ export default function App() {
 
   const resultCardRef = useRef<HTMLDivElement | null>(null)
   const celebrateOnceRef = useRef(false)
+  const sheetsCompletionIdRef = useRef<string | null>(null)
   const audioRef = useRef<HTMLAudioElement | null>(null)
 
   const currentQuestion: QuizQuestion | undefined = view === 'quiz' ? quizData[currentIndex] : undefined
@@ -216,6 +218,7 @@ export default function App() {
     setScore(0)
     setUserAnswers([])
     celebrateOnceRef.current = false
+    sheetsCompletionIdRef.current = null
     setScreenshotState('idle')
   }
 
@@ -241,6 +244,13 @@ export default function App() {
     })
 
     setView('result')
+
+    // Отправка результата в Google Таблицу — один раз за прохождение квиза.
+    if (!sheetsCompletionIdRef.current) {
+      const completionId = crypto.randomUUID()
+      sheetsCompletionIdRef.current = completionId
+      void submitQuizResultToGoogleSheets(finalScore, TOTAL_QUESTIONS, cat.label, completionId)
+    }
   }
 
   function handleAnswer(optionIndex: number) {
