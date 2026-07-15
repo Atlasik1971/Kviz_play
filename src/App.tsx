@@ -93,19 +93,14 @@ function getOptionReviewLabel(option: string | { text: string; image?: string; r
   return option.reviewText || option.text
 }
 
-function buildShareTextBody(score: number, totalQuestions: number, status: string): string {
-  return [
-    'Я прошёл «Квиз о Московском районе»!',
-    '',
-    `Мой результат: ${score} из ${totalQuestions}`,
-    `Статус: ${status}`,
-    '',
-    'Проверьте, насколько хорошо вы знаете Московский район:',
-  ].join('\n')
-}
-
-function buildShareTextFull(score: number, totalQuestions: number, status: string): string {
-  return `${buildShareTextBody(score, totalQuestions, status)}\n${QUIZ_SHARE_URL}`
+function buildShareText(score: number, totalQuestions: number, status: string): string {
+  return (
+    `Я прошёл «Квиз о Московском районе»!\n\n` +
+    `Мой результат: ${score} из ${totalQuestions}\n` +
+    `Статус: ${status}\n\n` +
+    `Проверьте, насколько хорошо вы знаете Московский район:\n` +
+    `«Квиз о Московском районе»`
+  )
 }
 
 export default function App() {
@@ -322,14 +317,17 @@ export default function App() {
   }
 
   async function handleShareResult() {
-    const shareText = buildShareTextFull(score, TOTAL_QUESTIONS, resultCategory.label)
+    const quizUrl = QUIZ_SHARE_URL
+    const status = resultCategory.label
+    const shareText = buildShareText(score, TOTAL_QUESTIONS, status)
+    const fallbackText = `${shareText}\n${quizUrl}`
 
     if (typeof navigator.share === 'function') {
       try {
         await navigator.share({
           title: 'Квиз о Московском районе',
-          text: buildShareTextBody(score, TOTAL_QUESTIONS, resultCategory.label),
-          url: QUIZ_SHARE_URL,
+          text: shareText,
+          url: quizUrl,
         })
         return
       } catch (error) {
@@ -337,21 +335,31 @@ export default function App() {
       }
     }
 
+    let copied = false
     try {
-      await navigator.clipboard.writeText(shareText)
+      await navigator.clipboard.writeText(fallbackText)
+      copied = true
     } catch {
-      const textarea = document.createElement('textarea')
-      textarea.value = shareText
-      textarea.setAttribute('readonly', 'true')
-      textarea.style.position = 'fixed'
-      textarea.style.left = '-9999px'
-      document.body.appendChild(textarea)
-      textarea.select()
-      document.execCommand('copy')
-      textarea.remove()
+      try {
+        const textarea = document.createElement('textarea')
+        textarea.value = fallbackText
+        textarea.setAttribute('readonly', 'true')
+        textarea.style.position = 'fixed'
+        textarea.style.left = '-9999px'
+        document.body.appendChild(textarea)
+        textarea.select()
+        copied = document.execCommand('copy')
+        textarea.remove()
+      } catch {
+        copied = false
+      }
     }
 
-    setShareNotice('Результат и ссылка на квиз скопированы. Можно отправить их в мессенджере.')
+    if (copied) {
+      setShareNotice('Результат и ссылка на квиз скопированы. Можно отправить их в мессенджере.')
+    } else {
+      setShareNotice('Не удалось автоматически поделиться результатом. Скопируйте ссылку на квиз вручную.')
+    }
     window.setTimeout(() => setShareNotice(null), 4500)
   }
 
