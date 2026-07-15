@@ -23,6 +23,7 @@ type Stats = {
 
 const STORAGE_KEY = 'kviz_moskovsky_stats_v1'
 const TOTAL_QUESTIONS = quizData.length
+const QUIZ_SHARE_URL = 'https://atlasik1971.github.io/Kviz_play/'
 
 type SoundState = 'idle' | 'playing' | 'blocked' | 'error' | 'done'
 
@@ -92,6 +93,21 @@ function getOptionReviewLabel(option: string | { text: string; image?: string; r
   return option.reviewText || option.text
 }
 
+function buildShareTextBody(score: number, totalQuestions: number, status: string): string {
+  return [
+    'Я прошёл «Квиз о Московском районе»!',
+    '',
+    `Мой результат: ${score} из ${totalQuestions}`,
+    `Статус: ${status}`,
+    '',
+    'Проверьте, насколько хорошо вы знаете Московский район:',
+  ].join('\n')
+}
+
+function buildShareTextFull(score: number, totalQuestions: number, status: string): string {
+  return `${buildShareTextBody(score, totalQuestions, status)}\n${QUIZ_SHARE_URL}`
+}
+
 export default function App() {
   const [view, setView] = useState<View>('splash')
   const [currentIndex, setCurrentIndex] = useState(0)
@@ -100,6 +116,7 @@ export default function App() {
 
   const [stats, setStats] = useState<Stats>(() => defaultStats)
   const [screenshotState, setScreenshotState] = useState<'idle' | 'loading' | 'done' | 'error'>('idle')
+  const [shareNotice, setShareNotice] = useState<string | null>(null)
   const [soundState, setSoundState] = useState<SoundState>('idle')
 
   const resultCardRef = useRef<HTMLDivElement | null>(null)
@@ -220,6 +237,7 @@ export default function App() {
     celebrateOnceRef.current = false
     sheetsCompletionIdRef.current = null
     setScreenshotState('idle')
+    setShareNotice(null)
   }
 
   async function handlePlayResultSound() {
@@ -301,6 +319,40 @@ export default function App() {
     } catch {
       setScreenshotState('error')
     }
+  }
+
+  async function handleShareResult() {
+    const shareText = buildShareTextFull(score, TOTAL_QUESTIONS, resultCategory.label)
+
+    if (typeof navigator.share === 'function') {
+      try {
+        await navigator.share({
+          title: 'Квиз о Московском районе',
+          text: buildShareTextBody(score, TOTAL_QUESTIONS, resultCategory.label),
+          url: QUIZ_SHARE_URL,
+        })
+        return
+      } catch (error) {
+        if (error instanceof DOMException && error.name === 'AbortError') return
+      }
+    }
+
+    try {
+      await navigator.clipboard.writeText(shareText)
+    } catch {
+      const textarea = document.createElement('textarea')
+      textarea.value = shareText
+      textarea.setAttribute('readonly', 'true')
+      textarea.style.position = 'fixed'
+      textarea.style.left = '-9999px'
+      document.body.appendChild(textarea)
+      textarea.select()
+      document.execCommand('copy')
+      textarea.remove()
+    }
+
+    setShareNotice('Результат и ссылка на квиз скопированы. Можно отправить их в мессенджере.')
+    window.setTimeout(() => setShareNotice(null), 4500)
   }
 
   return (
@@ -527,10 +579,19 @@ export default function App() {
                 <button className="secondaryBtn" onClick={handleScreenshot} disabled={screenshotState === 'loading'}>
                   {screenshotState === 'loading' ? 'Сохраняю...' : 'Сделать скриншот результата'}
                 </button>
+                <button className="shareBtn" type="button" onClick={() => void handleShareResult()}>
+                  Поделиться результатом
+                </button>
                 <button className="ghostBtn" onClick={startQuiz}>
                   Начать заново
                 </button>
               </div>
+
+              {shareNotice && (
+                <div className="shareNotice" role="status">
+                  {shareNotice}
+                </div>
+              )}
 
               {soundState === 'blocked' && (
                 <div className="kvizRow" style={{ marginTop: 12 }}>
